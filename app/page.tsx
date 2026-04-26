@@ -216,7 +216,9 @@ export default function HomePage() {
   const rankedPrice = boostMode === 'carry' ? rankedBase * 2 : rankedBase;
   const prestigePrice = calcPrestigePrice(fromPrestige, toPrestige);
 
-  const cartTotal = cart.reduce((s, i) => s + i.price, 0);
+  const cartSubtotal = cart.reduce((s, i) => s + i.price, 0);
+  const serviceFee = cartSubtotal * 0.05;
+  const cartTotal = cartSubtotal + serviceFee;
 
   function addRanked() {
     if (toRank <= fromRank) return;
@@ -649,7 +651,16 @@ export default function HomePage() {
         </div>
 
         <div className="cart-foot">
-          <div className="cart-total-row">
+          <div className="cart-total-row" style={{ marginBottom: 6 }}>
+            <div className="cart-total-label" style={{ fontSize: 11 }}>Subtotal</div>
+            <div style={{ fontFamily: 'Rajdhani, sans-serif', fontWeight: 600, fontSize: 16, color: 'var(--text)' }}>€ {cartSubtotal.toFixed(2)}</div>
+          </div>
+          <div className="cart-total-row" style={{ marginBottom: 14 }}>
+            <div className="cart-total-label" style={{ fontSize: 11, color: 'var(--purple)', opacity: 0.9 }}>Service Fee (5%)</div>
+            <div style={{ fontFamily: 'Rajdhani, sans-serif', fontWeight: 600, fontSize: 16, color: 'var(--purple)' }}>€ {serviceFee.toFixed(2)}</div>
+          </div>
+          <div style={{ height: 1, background: 'var(--border)', marginBottom: 14 }} />
+          <div className="cart-total-row" style={{ marginBottom: 16 }}>
             <div className="cart-total-label">Total</div>
             <div className="cart-total-price">€ {cartTotal.toFixed(2)}</div>
           </div>
