@@ -213,7 +213,9 @@ export default function HomePage() {
   const [brawlerName, setBrawlerName] = useState('');
 
   const rankedBase = calcRankedPrice(fromRank, toRank);
-  const rankedPrice = boostMode === 'carry' ? rankedBase * 2 : rankedBase;
+  const isProDest = toRank === 21; // Pro rank — carry not available
+  const effectiveMode = isProDest ? 'boost' : boostMode;
+  const rankedPrice = effectiveMode === 'carry' ? rankedBase * 2 : rankedBase;
   const prestigePrice = calcPrestigePrice(fromPrestige, toPrestige);
 
   const cartSubtotal = cart.reduce((s, i) => s + i.price, 0);
@@ -225,7 +227,7 @@ export default function HomePage() {
     const item: CartItem = {
       id: Date.now().toString(),
       type: 'ranked',
-      label: `${RANKS[fromRank].label} → ${RANKS[toRank].label} (${boostMode === 'carry' ? 'Carry' : 'Boost'})`,
+      label: `${RANKS[fromRank].label} → ${RANKS[toRank].label} (${effectiveMode === 'carry' ? 'Carry' : 'Boost'})`,
       mode: boostMode,
       price: rankedPrice,
     };
@@ -480,10 +482,17 @@ export default function HomePage() {
 
           {/* Mode toggle */}
           <div className="mode-toggle">
-            <button className={`mode-btn${boostMode === 'boost' ? ' active' : ''}`} onClick={() => setBoostMode('boost')}>⬆ Boost</button>
-            <button className={`mode-btn${boostMode === 'carry' ? ' active' : ''}`} onClick={() => setBoostMode('carry')}>🎮 Carry</button>
+            <button className={`mode-btn${effectiveMode === 'boost' ? ' active' : ''}`} onClick={() => setBoostMode('boost')}>⬆ Boost</button>
+            <button
+              className={`mode-btn${effectiveMode === 'carry' ? ' active' : ''}`}
+              onClick={() => { if (!isProDest) setBoostMode('carry'); }}
+              disabled={isProDest}
+              title={isProDest ? 'Carry is not available for Pro rank' : ''}
+              style={isProDest ? { opacity: 0.35, cursor: 'not-allowed' } : {}}
+            >🎮 Carry</button>
           </div>
-          {boostMode === 'carry' && <div className="carry-note">Carry = you play alongside our booster · <span>2× price</span></div>}
+          {isProDest && <div className="carry-note">Carry is <span>not available</span> for Pro rank — Boost only</div>}
+          {!isProDest && effectiveMode === 'carry' && <div className="carry-note">Carry = you play alongside our booster · <span>2× price</span></div>}
 
           {/* Rank selectors */}
           <div className="rank-row">
@@ -506,7 +515,7 @@ export default function HomePage() {
                     <span className="breakdown-price">{s.price.toFixed(2)} €</span>
                   </div>
                 ))}
-                {boostMode === 'carry' && (
+                {effectiveMode === 'carry' && (
                   <div className="breakdown-row" style={{ marginTop: 8 }}>
                     <span className="breakdown-label" style={{ color: 'var(--purple)' }}>Carry ×2</span>
                     <span className="breakdown-price" style={{ color: 'var(--purple)' }}>{rankedBase.toFixed(2)} € × 2</span>
