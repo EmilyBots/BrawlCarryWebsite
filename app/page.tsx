@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import CheckoutModal from '@/components/CheckoutModal';
 
 // ─── Rank Data ────────────────────────────────────────────────────────────────
 const RANKS = [
@@ -201,6 +202,7 @@ function PrestigeSelect({ value, onChange, label, min }: {
 export default function HomePage() {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [cartOpen, setCartOpen] = useState(false);
+  const [checkoutOpen, setCheckoutOpen] = useState(false);
 
   // Ranked state
   const [fromRank, setFromRank] = useState(3);  // Silver I
@@ -673,7 +675,7 @@ export default function HomePage() {
             <div className="cart-total-label">Total</div>
             <div className="cart-total-price">€ {cartTotal.toFixed(2)}</div>
           </div>
-          <button className="checkout-btn" disabled={cart.length === 0}>
+          <button className="checkout-btn" disabled={cart.length === 0} onClick={() => { setCartOpen(false); setCheckoutOpen(true); }}>
             Proceed to Checkout
           </button>
           <div className="discord-note">
@@ -681,6 +683,16 @@ export default function HomePage() {
           </div>
         </div>
       </div>
+
+      {checkoutOpen && (
+        <CheckoutModal
+          cart={cart}
+          subtotal={cartSubtotal}
+          fee={serviceFee}
+          total={cartTotal}
+          onClose={() => setCheckoutOpen(false)}
+        />
+      )}
     </>
   );
 }
