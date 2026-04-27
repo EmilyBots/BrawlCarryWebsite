@@ -23,7 +23,6 @@ export async function POST(req: NextRequest) {
     const existing = await prisma.user.findFirst({
       where: { OR: [{ email }, { username }] },
     });
-
     if (existing) {
       if (existing.email === email) {
         return NextResponse.json({ error: 'An account with this email already exists.' }, { status: 409 });
