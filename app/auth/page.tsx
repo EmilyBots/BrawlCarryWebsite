@@ -4,6 +4,27 @@ import { useState, useRef, useEffect } from 'react';
 
 type View = 'login' | 'signup' | 'verify' | 'forgot' | 'forgot-verify' | 'reset';
 
+// ── Safe fetch helper ────────────────────────────────────────────────────────
+// Returns { ok, status, data } — never throws.
+// If the response isn't JSON (e.g. Railway HTML error page), data.error explains it.
+async function safeFetch(url: string, options: RequestInit): Promise<{ ok: boolean; status: number; data: Record<string, unknown> }> {
+  let res: Response;
+  try {
+    res = await fetch(url, options);
+  } catch (err) {
+    console.error(`[FETCH NETWORK ERROR] ${url}`, err);
+    return { ok: false, status: 0, data: { error: 'Network error — check your connection and try again.' } };
+  }
+  let data: Record<string, unknown> = {};
+  try {
+    data = await res.json();
+  } catch (err) {
+    console.error(`[FETCH JSON ERROR] ${url} (status ${res.status})`, err);
+    data = { error: `Server error (${res.status}). Please try again or contact support.` };
+  }
+  return { ok: res.ok, status: res.status, data };
+}
+
 export default function AuthPage() {
   const [activeTab, setActiveTab] = useState<'login' | 'signup'>('login');
   const [view, setView] = useState<View>('login');
@@ -59,83 +80,73 @@ export default function AuthPage() {
 
   async function handleLogin() {
     clearMsg(); setLoading(true);
-    try {
-      const res = await fetch('/api/auth/signin', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: loginEmail, password: loginPassword, remember: rememberMe }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        if (data.needsVerification) { setPendingEmail(data.email); setView('verify'); }
-        else setError(data.error);
-      } else { setSuccess('Signed in! Redirecting...'); setTimeout(() => { window.location.href = '/'; }, 1200); }
-    } catch { setError('Network error. Please try again.'); }
-    finally { setLoading(false); }
+    const { ok, data } = await safeFetch('/api/auth/signin', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: loginEmail, password: loginPassword, remember: rememberMe }),
+    });
+    if (!ok) {
+      if (data.needsVerification) { setPendingEmail(data.email as string); setView('verify'); }
+      else setError(data.error as string);
+    } else {
+      setSuccess('Signed in! Redirecting...');
+      setTimeout(() => { window.location.href = '/'; }, 1200);
+    }
+    setLoading(false);
   }
 
   async function handleSignup() {
     clearMsg();
     if (signupPassword !== signupConfirm) { setError('Passwords do not match.'); return; }
     setLoading(true);
-    try {
-      const res = await fetch('/api/auth/signup', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username: signupUsername, email: signupEmail, password: signupPassword }),
-      });
-      const data = await res.json();
-      if (!res.ok) setError(data.error);
-      else { setPendingEmail(signupEmail); setView('verify'); setResendCooldown(60); }
-    } catch { setError('Network error. Please try again.'); }
-    finally { setLoading(false); }
+    const { ok, data } = await safeFetch('/api/auth/signup', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username: signupUsername, email: signupEmail, password: signupPassword }),
+    });
+    if (!ok) setError(data.error as string);
+    else { setPendingEmail(signupEmail); setView('verify'); setResendCooldown(60); }
+    setLoading(false);
   }
 
   async function handleVerify() {
-    clearMsg(); setLoading(true);
+    clearMsg();
     const code = otp.join('');
-    if (code.length < 6) { setError('Please enter the full 6-digit code.'); setLoading(false); return; }
-    try {
-      const res = await fetch('/api/auth/verify-email', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: pendingEmail, code }),
-      });
-      const data = await res.json();
-      if (!res.ok) setError(data.error);
-      else { setSuccess('Email verified! Redirecting...'); setTimeout(() => { window.location.href = '/'; }, 1200); }
-    } catch { setError('Network error. Please try again.'); }
-    finally { setLoading(false); }
+    if (code.length < 6) { setError('Please enter the full 6-digit code.'); return; }
+    setLoading(true);
+    const { ok, data } = await safeFetch('/api/auth/verify-email', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: pendingEmail, code }),
+    });
+    if (!ok) setError(data.error as string);
+    else { setSuccess('Email verified! Redirecting...'); setTimeout(() => { window.location.href = '/'; }, 1200); }
+    setLoading(false);
   }
 
   async function handleResend(forForgot = false) {
     if (resendCooldown > 0) return;
     clearMsg();
-    try {
-      if (forForgot) {
-        await fetch('/api/auth/forgot-password', {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email: pendingEmail }),
-        });
-      } else {
-        await fetch('/api/auth/verify-email', {
-          method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email: pendingEmail }),
-        });
-      }
-      setSuccess('New code sent!'); setResendCooldown(60); setOtp(['','','','','','']);
-    } catch { setError('Network error. Please try again.'); }
+    if (forForgot) {
+      await safeFetch('/api/auth/forgot-password', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: pendingEmail }),
+      });
+    } else {
+      await safeFetch('/api/auth/verify-email', {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: pendingEmail }),
+      });
+    }
+    setSuccess('New code sent!'); setResendCooldown(60); setOtp(['','','','','','']);
   }
 
   async function handleForgot() {
     clearMsg(); setLoading(true);
-    try {
-      const res = await fetch('/api/auth/forgot-password', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: forgotEmail }),
-      });
-      const data = await res.json();
-      if (!res.ok) setError(data.error);
-      else { setPendingEmail(forgotEmail); setView('forgot-verify'); setResendCooldown(60); setOtp(['','','','','','']); }
-    } catch { setError('Network error. Please try again.'); }
-    finally { setLoading(false); }
+    const { ok, data } = await safeFetch('/api/auth/forgot-password', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: forgotEmail }),
+    });
+    if (!ok) setError(data.error as string);
+    else { setPendingEmail(forgotEmail); setView('forgot-verify'); setResendCooldown(60); setOtp(['','','','','','']); }
+    setLoading(false);
   }
 
   async function handleReset() {
@@ -143,19 +154,16 @@ export default function AuthPage() {
     if (newPassword !== newPasswordConfirm) { setError('Passwords do not match.'); return; }
     if (newPassword.length < 8) { setError('Password must be at least 8 characters.'); return; }
     setLoading(true);
-    try {
-      const res = await fetch('/api/auth/reset-password', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: pendingEmail, code: otp.join(''), newPassword }),
-      });
-      const data = await res.json();
-      if (!res.ok) setError(data.error);
-      else {
-        setSuccess('Password reset! Sign in with your new password.');
-        setTimeout(() => { setView('login'); setActiveTab('login'); setOtp(['','','','','','']); setSuccess(''); }, 2000);
-      }
-    } catch { setError('Network error. Please try again.'); }
-    finally { setLoading(false); }
+    const { ok, data } = await safeFetch('/api/auth/reset-password', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: pendingEmail, code: otp.join(''), newPassword }),
+    });
+    if (!ok) setError(data.error as string);
+    else {
+      setSuccess('Password reset! Sign in with your new password.');
+      setTimeout(() => { setView('login'); setActiveTab('login'); setOtp(['','','','','','']); setSuccess(''); }, 2000);
+    }
+    setLoading(false);
   }
 
   function handleOtpChange(index: number, value: string) {
@@ -439,7 +447,7 @@ export default function AuthPage() {
             </div>
           )}
 
-          {/* FORGOT PASSWORD - enter email */}
+          {/* FORGOT PASSWORD */}
           {view === 'forgot' && (
             <div>
               <button className="back-link" onClick={() => { clearMsg(); setView('login'); }}>← Back to Sign In</button>
@@ -459,7 +467,7 @@ export default function AuthPage() {
             </div>
           )}
 
-          {/* FORGOT VERIFY - enter code */}
+          {/* FORGOT VERIFY */}
           {view === 'forgot-verify' && (
             <div>
               <button className="back-link" onClick={() => { clearMsg(); setView('forgot'); }}>← Change Email</button>
@@ -483,7 +491,7 @@ export default function AuthPage() {
             </div>
           )}
 
-          {/* RESET PASSWORD - new password */}
+          {/* RESET PASSWORD */}
           {view === 'reset' && (
             <div>
               <button className="back-link" onClick={() => { clearMsg(); setView('forgot-verify'); }}>← Back</button>
