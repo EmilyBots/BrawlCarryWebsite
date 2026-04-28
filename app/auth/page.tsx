@@ -433,7 +433,8 @@ export default function AuthPage() {
                 {otp.map((digit, i) => (
                   <input key={i} ref={el => { otpRefs.current[i] = el; }} className={`otp-input${digit ? ' filled' : ''}`}
                     type="text" inputMode="numeric" maxLength={1} value={digit}
-                    onChange={e => handleOtpChange(i, e.target.value)} onKeyDown={e => handleOtpKeyDown(i, e)} autoFocus={i === 0} />
+                    onChange={e => handleOtpChange(i, e.target.value)} onKeyDown={e => handleOtpKeyDown(i, e)} autoFocus={i === 0} 
+                    style={{ color: '#00d4ff' }} />
                 ))}
               </div>
               <button className="btn-submit" onClick={handleVerify} disabled={loading}>
